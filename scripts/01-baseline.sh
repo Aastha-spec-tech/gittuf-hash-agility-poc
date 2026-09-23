@@ -17,12 +17,10 @@ mkdir -p "${KEYS_DIR}" "${WORK_DIR}" "${RESULTS_DIR}"
 BASELINE_LOG="${RESULTS_DIR}/01-baseline.txt"
 
 # Locate gittuf binary
-GITTUF_BIN="${POC_ROOT}/../gittuf.exe"
-if [ ! -f "${GITTUF_BIN}" ]; then
-    GITTUF_BIN="/c/Users/explo/Desktop/gittuf/gittuf.exe"
-fi
-if [ ! -f "${GITTUF_BIN}" ]; then
-    GITTUF_BIN="$(command -v gittuf || true)"
+GITTUF_BIN="${GITTUF:-$(command -v gittuf || true)}"
+if [ -z "${GITTUF_BIN}" ]; then
+    echo "gittuf not found; set GITTUF=/path/to/gittuf" >&2
+    exit 2
 fi
 
 exec > >(tee "${BASELINE_LOG}") 2>&1
@@ -84,8 +82,11 @@ echo "Feature B content" > feature_b.txt
 git add feature_b.txt
 run_cmd "Commit 3" git commit -m "Add feature B"
 
-# Annotated Tag v1.0.0
-run_cmd "Annotated Tag v1.0.0" git tag -a v1.0.0 -m "Release version 1.0.0"
+# SSH-signed tag v1.0.0 (Probe 3 in 05-edge.sh tests whether this signature survives migration)
+echo "dev@example.com $(cat "${KEYS_DIR}/dev.pub")" > "${WORK_DIR}/allowed_signers_tags"
+git config gpg.ssh.allowedSignersFile "${WORK_DIR}/allowed_signers_tags"
+run_cmd "Signed Tag v1.0.0" git tag -s v1.0.0 -m "Release version 1.0.0"
+run_cmd "Verify Signed Tag v1.0.0 (SHA-1)" git verify-tag v1.0.0
 
 # 3. Initialize gittuf metadata BEFORE recording main reference
 echo "=== Step 3: Initializing gittuf Root of Trust & Policies ==="

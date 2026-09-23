@@ -78,10 +78,12 @@ Full empirical findings: [results/RESULTS.md](results/RESULTS.md).
 | **A: Baseline** | Original SHA-1 gittuf repository | PASS | **PASS** | 0 |
 | **B: Naive Copy** | Fast-exported to SHA-256; `refs/gittuf/*` copied | FAIL | **FAIL** | 1 |
 | **C: Fresh Chain** | Fresh SHA-256 repo (no historical state) | PASS | **PASS** | 0 |
-| **D: Genesis Bridge** | Fresh SHA-256 repo + RSL genesis link to SHA-1 | PASS | **PASS** | 0 |
-| **E: Attestation** | Cross-signing DSSE mapping SHA-1 to SHA-256 | PASS | **PASS** | 0 |
+| **D: Genesis Bridge** | Scenario C + old-root-signed genesis record committed in `refs/gittuf/attestations` and RSL-recorded | D1-D5 as expected | **As expected** (signature checked by ssh-keygen; gittuf only tolerates the record) | 0 |
+| **E: Attestation** | Cross-signing DSSE mapping SHA-1 to SHA-256, added to the same ref | verify PASS, tamper FAIL | **As expected** (checked by ssh-keygen + PoC helper, not gittuf) | 0 |
 
-Scenario B is the security-critical one: a naive migration **fails closed**. gittuf tries to resolve the legacy 40-character target IDs recorded in the RSL, cannot find them in the SHA-256 object store, and errors out rather than silently accepting the unverified history.
+Scenario B is the security-critical one: a naive migration **fails closed** at two layers. First, Git refuses the cross-algorithm fetch (`fatal: mismatched algorithms: client sha256; server sha1`). Second, the RSL still arrives through `fast-export --all`, but the target IDs inside its entries are still SHA-1, so `gittuf verify-ref` cannot resolve them and exits 1.
+
+gittuf does not yet verify the genesis record (D) or the hash-equivalence attestation (E). The PoC shows they can be embedded safely, not that gittuf enforces them. See [results/RESULTS.md](results/RESULTS.md).
 
 ---
 
