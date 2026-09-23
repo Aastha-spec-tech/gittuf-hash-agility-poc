@@ -21,3 +21,8 @@ test-sync-repo/
 *.test
 .DS_Store
 Thumbs.db
+gittuf-upstream/
+
+dist/*
+*.prof
+vendor*

@@ -22,7 +22,7 @@ Every statement below points at a log in `results/`. All logs were regenerated i
 1. **Git refuses the cross-algorithm fetch.** Fetching `refs/gittuf/*` from the SHA-1 repo into the SHA-256 repo fails outright:
    > `fatal: mismatched algorithms: client sha256; server sha1` (`FETCH EXIT: 128`)
 2. **gittuf cannot resolve the SHA-1 IDs inside the RSL.** The RSL arrives anyway, because `git fast-export --all` exports every ref, `refs/gittuf/*` included. The RSL commits get new SHA-256 IDs, but the target IDs written in their messages stay 40-character SHA-1. `verify-ref` then looks one up and fails:
-   > `Error: unable to inspect if object is commit: ... cat-file -t 925c319aeb63f8d7c191d094e69f845e623baf47`: `fatal: Not a valid object name 925c319aeb63f8d7c191d094e69f845e623baf47` (`EXIT: 1`)
+   > `Error: unable to inspect if object is commit: ... cat-file -t 6ee002a59681509586feb316fe18f98c38e66d26`: `fatal: Not a valid object name 6ee002a59681509586feb316fe18f98c38e66d26` (`EXIT: 1`)
 
 An earlier version of this section described only layer 2 and called it a deliberate defence. It is fail-closed behaviour, but nothing in gittuf targets hash migration specifically.
 

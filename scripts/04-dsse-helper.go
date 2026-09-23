@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"time"
-	"io/ioutil"
 )
 
 type InTotoStatement struct {
@@ -43,7 +42,7 @@ type DSSESignature struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: dsse-helper <pae|envelope|tamper> [args...]")
+		fmt.Println("Usage: dsse-helper <pae|envelope|payload|tamper> [args...]")
 		os.Exit(1)
 	}
 
@@ -74,11 +73,15 @@ func main() {
 			},
 		}
 
-		statementBytes, _ := json.Marshal(statement)
-		
+		statementBytes, err := json.Marshal(statement)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling statement: %v\n", err)
+			os.Exit(1)
+		}
+
 		if command == "payload" {
-		    fmt.Print(string(statementBytes))
-		    return
+			fmt.Print(string(statementBytes))
+			return
 		}
 
 		pae := fmt.Sprintf("DSSEv1 %d %s %d %s", len("application/vnd.in-toto+json"), "application/vnd.in-toto+json", len(statementBytes), string(statementBytes))
@@ -89,14 +92,19 @@ func main() {
 		}
 
 		if command == "envelope" {
+			if len(os.Args) < 6 {
+				fmt.Println("Usage: dsse-helper envelope <sha1> <sha256> <keyID> <sigFile>")
+				os.Exit(1)
+			}
 			keyID := os.Args[4]
 			sigFile := os.Args[5]
-			
-			sigBytes, err := ioutil.ReadFile(sigFile)
+
+			sigBytes, err := os.ReadFile(sigFile)
 			if err != nil {
-				panic(err)
+				fmt.Fprintf(os.Stderr, "Error reading sig file: %v\n", err)
+				os.Exit(1)
 			}
-			
+
 			b64Sig := base64.StdEncoding.EncodeToString(sigBytes)
 
 			envelope := DSSEEnvelope{
@@ -106,28 +114,84 @@ func main() {
 					{KeyID: keyID, Sig: b64Sig},
 				},
 			}
-			
-			envBytes, _ := json.MarshalIndent(envelope, "", "  ")
+
+			envBytes, err := json.MarshalIndent(envelope, "", "  ")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error marshaling envelope: %v\n", err)
+				os.Exit(1)
+			}
 			fmt.Println(string(envBytes))
 		}
 	} else if command == "tamper" {
 		if len(os.Args) < 3 {
-			panic("Usage: dsse-helper tamper <envelope_file>")
+			fmt.Println("Usage: dsse-helper tamper <envelope_file>")
+			os.Exit(1)
 		}
-		envBytes, _ := ioutil.ReadFile(os.Args[2])
+		envBytes, err := os.ReadFile(os.Args[2])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading envelope: %v\n", err)
+			os.Exit(1)
+		}
 		var env DSSEEnvelope
-		json.Unmarshal(envBytes, &env)
-		
-		payloadBytes, _ := base64.StdEncoding.DecodeString(env.Payload)
+		if err := json.Unmarshal(envBytes, &env); err != nil {
+			fmt.Fprintf(os.Stderr, "Error unmarshaling envelope: %v\n", err)
+			os.Exit(1)
+		}
+
+		payloadBytes, err := base64.StdEncoding.DecodeString(env.Payload)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error decoding payload: %v\n", err)
+			os.Exit(1)
+		}
 		var statement InTotoStatement
-		json.Unmarshal(payloadBytes, &statement)
-		
-		statement.Subject[1].Digest["sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
-		
-		tamperedBytes, _ := json.Marshal(statement)
+		if err := json.Unmarshal(payloadBytes, &statement); err != nil {
+			fmt.Fprintf(os.Stderr, "Error unmarshaling statement: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(statement.Subject) > 1 {
+			statement.Subject[1].Digest["sha256"] = "0000000000000000000000000000000000000000000000000000000000000000"
+		}
+
+		tamperedBytes, err := json.Marshal(statement)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling tampered statement: %v\n", err)
+			os.Exit(1)
+		}
 		env.Payload = base64.StdEncoding.EncodeToString(tamperedBytes)
-		
-		outBytes, _ := json.MarshalIndent(env, "", "  ")
+
+		outBytes, err := json.MarshalIndent(env, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling tampered envelope: %v\n", err)
+			os.Exit(1)
+		}
 		fmt.Println(string(outBytes))
+	} else if command == "extract" {
+		if len(os.Args) < 5 {
+			fmt.Println("Usage: dsse-helper extract <envelope_file> <sig_out> <payload_out>")
+			os.Exit(1)
+		}
+		envBytes, err := os.ReadFile(os.Args[2])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading envelope: %v\n", err)
+			os.Exit(1)
+		}
+		var env DSSEEnvelope
+		if err := json.Unmarshal(envBytes, &env); err != nil {
+			fmt.Fprintf(os.Stderr, "Error unmarshaling envelope: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(env.Signatures) > 0 {
+			sigBytes, err := base64.StdEncoding.DecodeString(env.Signatures[0].Sig)
+			if err == nil {
+				os.WriteFile(os.Args[3], sigBytes, 0644)
+			}
+		}
+
+		payloadBytes, err := base64.StdEncoding.DecodeString(env.Payload)
+		if err == nil {
+			os.WriteFile(os.Args[4], payloadBytes, 0644)
+		}
 	}
 }

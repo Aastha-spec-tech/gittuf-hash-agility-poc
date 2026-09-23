@@ -103,7 +103,7 @@ git clone --mirror archives/old-repo.bundle work/old-repo-audit > /dev/null 2>&1
 } | sed '/^$/d' | LC_ALL=C sort -u > work/probe4-commitment.txt
 
 NEW_COMMITMENT=$(sha256sum work/probe4-commitment.txt | awk '{print $1}')
-MANIFEST_COMMITMENT=$(cat archives/snapshot-manifest.json | grep -oP '"commitment_sha256": "\K[^"]+')
+MANIFEST_COMMITMENT=$(grep -o '"commitment_sha256": *"[^"]*"' archives/snapshot-manifest.json | head -1 | cut -d'"' -f4)
 
 if [ "$NEW_COMMITMENT" == "$MANIFEST_COMMITMENT" ]; then
   echo "RESULT 4: Determinism verified! Hash matches: $NEW_COMMITMENT"

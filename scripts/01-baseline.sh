@@ -17,7 +17,23 @@ mkdir -p "${KEYS_DIR}" "${WORK_DIR}" "${RESULTS_DIR}"
 BASELINE_LOG="${RESULTS_DIR}/01-baseline.txt"
 
 # Locate gittuf binary
-GITTUF_BIN="${GITTUF:-$(command -v gittuf || true)}"
+GITTUF_BIN="${GITTUF:-$(command -v gittuf 2>/dev/null || true)}"
+if [ -z "${GITTUF_BIN}" ]; then
+    CURRENT_USER="${USER:-${USERNAME:-}}"
+    for candidate in \
+        "${HOME}/go/bin/gittuf" \
+        "${HOME}/go/bin/gittuf.exe" \
+        "/c/Users/${CURRENT_USER}/go/bin/gittuf.exe" \
+        "/mnt/c/Users/${CURRENT_USER}/go/bin/gittuf.exe" \
+        "${POC_ROOT}/bin/gittuf" \
+        "${POC_ROOT}/bin/gittuf.exe" \
+        "${POC_ROOT}/../gittuf.exe"; do
+        if [ -n "${candidate}" ] && [ -f "${candidate}" ]; then
+            GITTUF_BIN="${candidate}"
+            break
+        fi
+    done
+fi
 if [ -z "${GITTUF_BIN}" ]; then
     echo "gittuf not found; set GITTUF=/path/to/gittuf" >&2
     exit 2
