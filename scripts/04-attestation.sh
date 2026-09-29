@@ -1,3 +1,4 @@
+go build -o dsse-helper.exe scripts/04-dsse-helper.go
 #!/bin/bash
 set -e
 
@@ -7,15 +8,15 @@ SHA1_HEAD=$(git -C work/old-repo rev-parse main)
 SHA256_HEAD=$(git -C work/new-repo-attest rev-parse main)
 
 echo "[1] Generating DSSE PAE and payload for $SHA1_HEAD -> $SHA256_HEAD..."
-go run scripts/04-dsse-helper.go pae $SHA1_HEAD $SHA256_HEAD > work/pae.txt
-go run scripts/04-dsse-helper.go payload $SHA1_HEAD $SHA256_HEAD > work/payload.txt
+./dsse-helper.exe pae $SHA1_HEAD $SHA256_HEAD > work/pae.txt
+./dsse-helper.exe payload $SHA1_HEAD $SHA256_HEAD > work/payload.txt
 
 echo "[2] Signing PAE with old root key (gittuf native format)..."
 rm -f work/pae.txt.sig
 ssh-keygen -Y sign -n git -f keys/root work/pae.txt
 
 echo "[3] Building DSSE JSON envelope..."
-go run scripts/04-dsse-helper.go envelope $SHA1_HEAD $SHA256_HEAD keys/root.pub work/pae.txt.sig > work/hash-equivalence.json
+./dsse-helper.exe envelope $SHA1_HEAD $SHA256_HEAD keys/root.pub work/pae.txt.sig > work/hash-equivalence.json
 
 echo "[4] Adding to refs/gittuf/attestations in new SHA-256 repository..."
 cd work/new-repo-attest
@@ -37,7 +38,7 @@ echo "[5] VERIFICATION (Positive Test) -- done by ssh-keygen over the DSSE PAE, 
 echo "--------------------------------------------------------"
 git -C work/new-repo-attest show refs/gittuf/attestations:hash-equivalence.json > work/extracted.json
 
-go run scripts/04-dsse-helper.go extract work/extracted.json work/extracted.sig work/extracted_payload.txt
+./dsse-helper.exe extract work/extracted.json work/extracted.sig work/extracted_payload.txt
 PAYLOAD_LEN=$(wc -c < work/extracted_payload.txt)
 echo -n "DSSEv1 28 application/vnd.in-toto+json $PAYLOAD_LEN " > work/extracted_pae.txt
 cat work/extracted_payload.txt >> work/extracted_pae.txt
@@ -49,8 +50,8 @@ echo "    -> Verification SUCCESSFUL"
 echo "--------------------------------------------------------"
 echo "[6] VERIFICATION (Negative Tamper Test)"
 echo "--------------------------------------------------------"
-go run scripts/04-dsse-helper.go tamper work/extracted.json > work/tampered.json
-go run scripts/04-dsse-helper.go extract work/tampered.json work/tampered.sig work/tampered_payload.txt
+./dsse-helper.exe tamper work/extracted.json > work/tampered.json
+./dsse-helper.exe extract work/tampered.json work/tampered.sig work/tampered_payload.txt
 TAMPERED_LEN=$(wc -c < work/tampered_payload.txt)
 echo -n "DSSEv1 28 application/vnd.in-toto+json $TAMPERED_LEN " > work/tampered_pae.txt
 cat work/tampered_payload.txt >> work/tampered_pae.txt
@@ -63,4 +64,5 @@ else
 fi
 
 echo "=== Phase 3 Completed ==="
+
 
